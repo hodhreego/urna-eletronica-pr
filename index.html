@@ -1,0 +1,1273 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Simulação de Urna Eletrônica — Paraná 2026</title>
+<style>
+  :root{
+    --carcaca:#eef0ee;
+    --carcaca-sombra:#c7cac6;
+    --painel-preto:#1c1c1c;
+    --tela-fundo:#ffffff;
+    --tela-texto:#111111;
+    --azul-tse:#0b3d91;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family:Arial, Helvetica, sans-serif;
+    background:#dcdcdc;
+    min-height:100vh;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    padding:24px 12px;
+  }
+  /* ---- Aviso minimizável no cantinho ---- */
+  .aviso-chip{
+    position:fixed;
+    top:8px; right:8px;
+    z-index:50;
+    background:#b00020;
+    color:#fff;
+    border:none;
+    border-radius:20px;
+    padding:6px 12px;
+    font-size:12px;
+    font-weight:900;
+    letter-spacing:.3px;
+    cursor:pointer;
+    box-shadow:0 2px 8px rgba(0,0,0,.35);
+  }
+  .aviso-painel{
+    position:fixed;
+    top:44px; right:8px;
+    z-index:50;
+    width:min(340px, calc(100vw - 16px));
+    max-height:calc(100dvh - 60px);
+    overflow:auto;
+    background:#b00020;
+    color:#fff;
+    border-radius:10px;
+    padding:12px 14px;
+    font-size:13px;
+    line-height:1.45;
+    box-shadow:0 6px 18px rgba(0,0,0,.4);
+    display:none;
+  }
+  .aviso-painel.aberto{display:block;}
+  .aviso-painel b{display:block;font-size:15px;margin-bottom:6px;}
+
+  /* ---- Cena 3D ---- */
+  .urna-cena{
+    perspective:1400px;
+    padding-bottom:30px;
+  }
+  .urna{
+    width:700px;
+    max-width:97vw;
+    background:linear-gradient(180deg,var(--carcaca),var(--carcaca-sombra));
+    border-radius:10px;
+    padding:18px;
+    box-shadow:0 30px 45px -12px rgba(0,0,0,.5), inset 0 0 0 2px #fff;
+    transform:rotateX(8deg) rotateY(-6deg);
+    transform-style:preserve-3d;
+    transition:transform .25s ease;
+  }
+  .urna-cena:hover .urna{
+    transform:rotateX(5deg) rotateY(-3deg);
+  }
+  .urna-topo{
+    display:flex;
+    gap:14px;
+  }
+
+  /* ---- Tela (esquerda) ---- */
+  .tela-moldura{
+    flex:1.5;
+    background:#0c0c0c;
+    border-radius:6px;
+    padding:6px;
+    box-shadow:inset 0 0 0 2px #000;
+  }
+  .tela{
+    background:var(--tela-fundo);
+    border-radius:2px;
+    padding:16px 20px;
+    min-height:230px;
+    height:100%;
+    color:var(--tela-texto);
+    display:flex;
+    flex-direction:column;
+    justify-content:space-between;
+  }
+  .tela-conteudo{flex:1;}
+  .cargo{
+    font-size:27px;
+    font-weight:900;
+    text-transform:uppercase;
+    letter-spacing:.5px;
+    color:var(--azul-tse);
+    margin-bottom:10px;
+    border-bottom:2px solid #ddd;
+    padding-bottom:10px;
+  }
+  .numero-display{
+    font-family:'Courier New', monospace;
+    font-size:54px;
+    font-weight:bold;
+    letter-spacing:8px;
+    min-height:62px;
+    text-align:center;
+    margin:8px 0 12px;
+    color:#111;
+  }
+  .candidato-info{
+    font-size:19px;
+    line-height:1.5;
+    min-height:80px;
+  }
+  .candidato-nome{
+    font-size:27px;
+    font-weight:900;
+    text-transform:uppercase;
+    color:#000;
+    line-height:1.25;
+  }
+  .candidato-partido{font-size:18px;color:#444;font-weight:bold;}
+  .msg-erro{color:#c40024;font-weight:bold;font-size:19px;}
+  .msg-sistema{font-size:14px;color:#555;margin-top:8px;min-height:14px;font-weight:bold;}
+
+  /* ---- Painel direito ---- */
+  .painel-direito{
+    flex:1;
+    background:var(--painel-preto);
+    border-radius:6px;
+    padding:12px;
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+  }
+  .marca-tse{
+    background:#fff;
+    border-radius:4px;
+    padding:8px 10px;
+    display:flex;
+    align-items:center;
+    gap:8px;
+    font-size:14px;
+    font-weight:bold;
+    color:#111;
+    line-height:1.25;
+    text-transform:uppercase;
+  }
+  .marca-tse .brasao{
+    width:22px;height:22px;border-radius:50%;
+    background:var(--azul-tse);
+    flex-shrink:0;
+  }
+  .teclado{
+    display:grid;
+    grid-template-columns:repeat(3,1fr);
+    gap:6px;
+  }
+  .tecla{
+    background:#2c2c2c;
+    color:#fff;
+    border:1px solid #444;
+    border-radius:4px;
+    padding:14px 0;
+    font-size:23px;
+    font-weight:bold;
+    cursor:pointer;
+    user-select:none;
+  }
+  .tecla:active{background:#444;}
+  .acoes{
+    display:grid;
+    grid-template-columns:repeat(3,1fr);
+    gap:6px;
+  }
+  .tecla-acao{
+    border:none;
+    border-radius:4px;
+    padding:11px 2px;
+    font-size:13px;
+    font-weight:bold;
+    cursor:pointer;
+    color:#fff;
+  }
+  .tecla-acao.branco{background:#e8e8e8;color:#111;}
+  .tecla-acao.corrige{background:#e0762a;}
+  .tecla-acao.confirma{background:#2e8b3d;}
+  .tecla-acao:active{opacity:.8;}
+
+  .rodape-marca{
+    text-align:center;
+    color:#555;
+    font-size:10px;
+    margin-top:12px;
+    letter-spacing:.5px;
+  }
+
+  /* ---- Tela final ---- */
+  .tela-final{
+    background:#fff;
+    border-radius:12px;
+    padding:24px;
+    max-width:480px;
+    width:100%;
+    margin-top:18px;
+    box-shadow:0 6px 20px rgba(0,0,0,.15);
+    display:none;
+  }
+  .tela-final h2{margin-top:0;color:#0a4d2e;font-size:19px;}
+  .aviso-final{
+    background:#fff3cd;
+    border:2px solid #b00020;
+    color:#4a1010;
+    border-radius:10px;
+    padding:12px 14px;
+    font-size:14px;
+    line-height:1.5;
+    margin-bottom:14px;
+  }
+  .aviso-final b{display:block;color:#b00020;font-size:16px;margin-bottom:4px;}
+  .resumo-item{
+    display:flex;
+    justify-content:space-between;
+    gap:10px;
+    border-bottom:1px solid #eee;
+    padding:10px 0;
+    font-size:13.5px;
+  }
+  .resumo-item span.rotulo{color:#666;font-weight:bold;white-space:nowrap;}
+  .resumo-item span.valor{text-align:right;}
+  .btn-reiniciar{
+    margin-top:18px;
+    width:100%;
+    padding:12px;
+    background:#0a4d2e;
+    color:#fff;
+    border:none;
+    border-radius:8px;
+    font-size:15px;
+    font-weight:bold;
+    cursor:pointer;
+  }
+  .disclaimer-final{
+    margin-top:14px;
+    font-size:11.5px;
+    color:#888;
+    text-align:center;
+    line-height:1.4;
+  }
+
+  /* ---- Boletim saindo da impressora térmica ---- */
+  .boletim-slot{
+    background:#c7cac6;
+    border-radius:0 0 6px 6px;
+    padding:2px 10px 0;
+    margin-top:-4px;
+    box-shadow:inset 0 -4px 8px rgba(0,0,0,.15);
+  }
+  .boletim{
+    background:#fdfdf5;
+    border:1px dashed #999;
+    border-top:none;
+    font-family:'Courier New', monospace;
+    font-size:12.5px;
+    color:#111;
+    padding:14px 12px;
+    box-shadow:0 6px 10px rgba(0,0,0,.15);
+    clip-path:inset(0 0 100% 0);
+    transition:clip-path 3.2s cubic-bezier(.32,.02,.18,1);
+  }
+  .boletim.saiu{
+    clip-path:inset(0 0 0% 0);
+  }
+  .boletim-cabecalho{
+    text-align:center;
+    font-weight:bold;
+    letter-spacing:.5px;
+    margin-bottom:10px;
+    padding-bottom:8px;
+    border-bottom:1px dashed #999;
+  }
+
+  /* ---- Colinha colorida ---- */
+  .colinha{
+    margin-top:14px;
+    padding-top:12px;
+    border-top:2px dashed #999;
+    font-family:Arial, Helvetica, sans-serif;
+  }
+  .colinha.colinha-topo{margin-top:0;padding-top:0;border-top:none;}
+  .cabecalho-comprovante{margin-top:14px;padding-top:10px;border-bottom:1px dashed #999;}
+  .colinha-titulo{
+    text-align:center;
+    font-size:10px;
+    font-weight:bold;
+    color:#555;
+    margin-bottom:10px;
+    line-height:1.6;
+    font-family:'Courier New', monospace;
+  }
+  .colinha-titulo strong{
+    display:block;
+    font-size:13px;
+    color:#0a4d2e;
+    letter-spacing:.5px;
+  }
+  .colinha-grade{
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+  }
+  .colinha-item{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    border-radius:8px;
+    padding:7px 10px;
+    color:#fff;
+    box-shadow:0 2px 4px rgba(0,0,0,.15);
+    -webkit-print-color-adjust:exact;
+    print-color-adjust:exact;
+  }
+  .colinha-item .colinha-numero{
+    background:rgba(255,255,255,.92);
+    color:#111;
+    font-weight:900;
+    font-size:18px;
+    letter-spacing:1px;
+    border-radius:6px;
+    padding:3px 9px;
+    min-width:44px;
+    text-align:center;
+    flex-shrink:0;
+  }
+  .colinha-item .colinha-textos{line-height:1.2;}
+  .colinha-item .colinha-cargo{
+    font-size:9.5px;
+    font-weight:bold;
+    text-transform:uppercase;
+    opacity:.9;
+    letter-spacing:.5px;
+  }
+  .colinha-item .colinha-nome{
+    font-size:13px;
+    font-weight:900;
+    text-transform:uppercase;
+  }
+  .colinha-item.cor-0{background:linear-gradient(135deg,#e0353f,#b8202a);}
+  .colinha-item.cor-1{background:linear-gradient(135deg,#1d6fd6,#124e9e);}
+  .colinha-item.cor-2{background:linear-gradient(135deg,#12995e,#0a6e42);}
+  .colinha-item.cor-3{background:linear-gradient(135deg,#f2a71b,#c9840a);}
+  .colinha-item.cor-4{background:linear-gradient(135deg,#8b3fd6,#5f22a3);}
+  .colinha-item.cor-5{background:linear-gradient(135deg,#0aabc0,#087b8c);}
+
+  .boletim-rodape{
+    text-align:center;
+    margin-top:10px;
+    padding-top:8px;
+    border-top:1px dashed #999;
+    font-size:10.5px;
+    color:#555;
+  }
+  .acoes-finais{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:10px;
+    margin-top:14px;
+  }
+  .btn-acao-final{
+    padding:11px 4px;
+    border:none;
+    border-radius:8px;
+    font-size:13px;
+    font-weight:bold;
+    cursor:pointer;
+    color:#fff;
+  }
+  .btn-acao-final.imprimir{background:#3a3d40;}
+  .btn-acao-final.compartilhar{background:#25d366;}
+
+  /* ---- Celular em pé: tela em cima, teclado embaixo ---- */
+  @media (orientation:portrait) and (max-width:820px){
+    body{padding:46px 8px 12px;justify-content:flex-start;}
+    .urna-cena{width:100%;padding-bottom:12px;}
+    .urna{
+      width:100%;
+      max-width:520px;
+      margin:0 auto;
+      padding:10px;
+      transform:none !important;
+    }
+    .urna-topo{flex-direction:column;gap:10px;}
+    .tela{min-height:min(300px, 38dvh);padding:14px 16px;}
+    .cargo{font-size:clamp(20px, 6vw, 27px);}
+    .numero-display{font-size:clamp(38px, 11vw, 54px);letter-spacing:6px;min-height:50px;}
+    .candidato-nome{font-size:clamp(20px, 6vw, 27px);}
+    .tecla{padding:clamp(12px, 3.2dvh, 18px) 0;font-size:24px;}
+    .tecla-acao{padding:clamp(12px, 3dvh, 16px) 2px;font-size:14px;}
+    .rodape-marca{display:none;}
+  }
+
+  /* ---- Celular deitado (pouca altura): imita a urna real, tudo cabendo na tela ---- */
+  @media (orientation:landscape) and (max-height:560px){
+    body{padding:6px 6px 6px;justify-content:center;}
+    .urna-cena{padding-bottom:0;}
+    .urna{
+      width:min(98vw, 175dvh);
+      padding:8px;
+      transform:rotateX(3deg) rotateY(-2deg);
+    }
+    .urna-cena:hover .urna{transform:none;}
+    .tela{min-height:0;height:100%;padding:8px 12px;}
+    .cargo{font-size:clamp(14px, 4.4dvh, 22px);margin-bottom:4px;padding-bottom:4px;}
+    .numero-display{font-size:clamp(26px, 9dvh, 44px);min-height:0;margin:2px 0 4px;letter-spacing:5px;}
+    .candidato-info{font-size:clamp(12px, 3.6dvh, 17px);min-height:0;}
+    .candidato-nome{font-size:clamp(15px, 5dvh, 24px);}
+    .candidato-partido{font-size:clamp(12px, 3.6dvh, 16px);}
+    .msg-erro{font-size:clamp(12px, 3.6dvh, 16px);}
+    .msg-sistema{font-size:clamp(10px, 2.8dvh, 13px);margin-top:2px;}
+    .painel-direito{padding:8px;gap:6px;}
+    .marca-tse{font-size:11px;padding:4px 8px;}
+    .tecla{padding:clamp(6px, 2.6dvh, 12px) 0;font-size:clamp(15px, 4.4dvh, 22px);}
+    .tecla-acao{padding:clamp(6px, 2.2dvh, 10px) 2px;font-size:clamp(9px, 2.6dvh, 12px);}
+    .rodape-marca{display:none;}
+    .tela-final{margin-top:10px;}
+  }
+
+  @media print{
+    body *{visibility:hidden;}
+    .boletim, .boletim *{visibility:visible;}
+    .boletim{
+      position:absolute;
+      top:0; left:0;
+      width:280px;
+      border:none;
+      box-shadow:none;
+      clip-path:none;
+    }
+  }
+</style>
+</head>
+<body>
+
+<button class="aviso-chip" id="avisoChip" type="button" aria-expanded="false">⚠ SIMULAÇÃO · toque p/ ver aviso</button>
+<div class="aviso-painel" id="avisoPainel">
+  <b>SIMULAÇÃO — SEM VALOR ELEITORAL</b>
+  Ferramenta educativa e não oficial, sem qualquer vínculo com o TSE. Não coleta, não salva e não compartilha nenhum voto.<br><br>
+  Presidente, Governador‑PR e Senador‑PR: lista completa. Deputado Federal e Estadual‑PR: lista parcial (faltam candidatos — avise se não encontrar o seu).
+</div>
+
+<div class="urna-cena">
+<div class="urna" id="urna">
+  <div class="urna-topo">
+    <div class="tela-moldura">
+      <div class="tela">
+        <div class="tela-conteudo">
+          <div class="cargo" id="cargoLabel">CARGO</div>
+          <div class="numero-display" id="numeroDisplay">— —</div>
+          <div class="candidato-info" id="candidatoInfo">Digite o número do candidato e aperte CONFIRMA.</div>
+        </div>
+        <div class="msg-sistema" id="msgSistema"></div>
+      </div>
+    </div>
+    <div class="painel-direito">
+      <div class="marca-tse"><span class="brasao"></span>JUSTIÇA<br>ELEITORAL</div>
+      <div class="teclado">
+        <button class="tecla" data-num="1">1</button>
+        <button class="tecla" data-num="2">2</button>
+        <button class="tecla" data-num="3">3</button>
+        <button class="tecla" data-num="4">4</button>
+        <button class="tecla" data-num="5">5</button>
+        <button class="tecla" data-num="6">6</button>
+        <button class="tecla" data-num="7">7</button>
+        <button class="tecla" data-num="8">8</button>
+        <button class="tecla" data-num="9">9</button>
+        <button class="tecla" data-num="0" style="grid-column:2;">0</button>
+      </div>
+      <div class="acoes">
+        <button class="tecla-acao branco" id="btnBranco" type="button">BRANCO</button>
+        <button class="tecla-acao corrige" id="btnCorrige" type="button">CORRIGE</button>
+        <button class="tecla-acao confirma" id="btnConfirma" type="button">CONFIRMA</button>
+      </div>
+    </div>
+  </div>
+  <div class="rodape-marca">Simulação educativa — não oficial — não vinculada ao TSE · Teclado do PC: números, Enter = CONFIRMA, Backspace = CORRIGE, Espaço = BRANCO</div>
+</div>
+</div>
+
+<div class="tela-final" id="telaFinal">
+  <h2>✅ Simulação encerrada</h2>
+  <div class="aviso-final">
+    <b>⚠ Isto foi só uma SIMULAÇÃO</b>
+    Ela <u>não tem valor eleitoral nem estatístico</u> e não é pesquisa de intenção de voto.<br>
+    Tudo aconteceu <u>automaticamente no seu próprio aparelho</u>: seus votos não foram enviados para a internet, não foram guardados e ninguém tem acesso a eles. Ao fechar ou recarregar a página, tudo é apagado.
+  </div>
+
+  <div class="boletim-slot">
+    <div class="boletim" id="boletim">
+      <div class="colinha colinha-topo">
+        <div class="colinha-titulo"><strong>🗳️ MINHA COLINHA PARA VOTAR</strong>(na ordem da urna)</div>
+        <div class="colinha-grade" id="colinhaLista"></div>
+      </div>
+
+      <div class="boletim-cabecalho cabecalho-comprovante">
+        ✂ - - - - - - - - - - - - - - - - - - - -<br>
+        *** COMPROVANTE DE SIMULAÇÃO ***<br>
+        SEM VALOR ELEITORAL
+      </div>
+      <div id="resumoLista"></div>
+
+      <div class="boletim-rodape">
+        Simulação não oficial · não vinculada ao TSE<br>
+        Gerado em: <span id="dataHoraBoletim"></span>
+      </div>
+    </div>
+  </div>
+
+  <div class="acoes-finais">
+    <button class="btn-acao-final imprimir" id="btnImprimir" type="button">🖨️ Imprimir comprovante</button>
+    <button class="btn-acao-final compartilhar" id="btnCompartilhar" type="button">💬 Compartilhar no WhatsApp</button>
+  </div>
+
+  <button class="btn-reiniciar" id="btnReiniciar" type="button">Fazer nova simulação</button>
+  <div class="disclaimer-final">
+    Simulação não oficial, sem qualquer vínculo com a Justiça Eleitoral. Não substitui a votação real e não deve ser usada como pesquisa de intenção de voto. Ao compartilhar, você está enviando apenas o seu próprio resumo — nada é enviado a este site ou a terceiros.
+  </div>
+</div>
+
+<script>
+// ---------------------------------------------------------------
+// Dados: candidaturas registradas no TSE (2026). Formato: número|nome|partido
+// Presidente, Governador-PR e Senador-PR: listas completas.
+// Deputado Federal (200 de 394) e Estadual (200 de 583): listas PARCIAIS.
+// Para acrescentar um candidato, basta incluir uma linha "numero|Nome|PARTIDO".
+// ---------------------------------------------------------------
+function dados(txt){
+  const o = {};
+  txt.trim().split("\n").forEach(l=>{
+    const p = l.split("|");
+    if(p.length >= 3) o[p[0].trim()] = {nome:p[1].trim(), partido:p[2].trim()};
+  });
+  return o;
+}
+
+const D_PRESIDENTE = `
+13|Lula|PT
+22|Flávio Bolsonaro|PL
+30|Zema|Novo
+55|Ronaldo Caiado|PSD
+14|Renan Santos|Missão
+28|Pablo Marçal|PRTB
+35|Wilson Grassi (Veterinário)|Democrata
+70|Augusto Cury (Escritor)|Avante
+27|Clariana Barão|DC
+21|Edmilson Costa|PCB
+16|Hertz Dias|PSTU
+29|Rui Costa Pimenta|PCO
+80|Samara|UP
+`;
+
+const D_GOVERNADOR = `
+12|Requião Filho|PDT
+14|Luiz França|Missão
+16|Samuel de Mattos|PSTU
+22|Sergio Moro|PL
+29|Adriano Funileiro|PCO
+33|Alexandre Salomão|Mobiliza
+55|Sandro Alex|PSD
+80|Tayná Miessa|UP
+`;
+
+const D_SENADOR = `
+100|Alexandre Curi|Republicanos
+131|Gleisi Hoffmann|PT
+132|Dr. Rosinha|PT
+144|Karen Guerreiro|Missão
+222|Filipe Barros|PL
+290|Marcelo Marcelino|PCO
+300|Deltan Dallagnol|Novo
+555|Cristina Graeml|PSD
+800|Joaquim do MLB|UP
+`;
+
+const D_FEDERAL = `
+1313|Ana Júlia|PT
+2290|Sargento Fahur|PL
+1333|Renato Freitas|PT
+1244|Paulinho do Asfalto|PDT
+2222|Rosangela Moro|PL
+1363|Carol Dartora|PT
+3000|Jeffrey Chiquini|NOVO
+1110|Jocelito Canto|PP
+1120|Marcelo Belinati|PP
+1331|Tadeu Veneri|PT
+5575|Fabiana Vieira|PSD
+4545|Beto Richa|PSDB
+1310|Zeca Dirceu|PT
+1155|Marcelo Dal Negro|PP
+1212|Roberto Requião|PDT
+4444|Delegado Matheus Laiola|UNIÃO
+1399|Adriana Araujo|PT
+3020|Paulo Martins|NOVO
+4070|Charleston Júnior Inclusão|PSB
+4400|Diego Garcia|UNIÃO
+2000|Felipe Francischini|PODE
+4343|Aliel Machado|PV
+4412|Paulo Litro|UNIÃO
+2255|Aline Sleutjes|PL
+2277|Delegado Tito Xerifão|PL
+1323|Luciana Rafagnin|PT
+5511|Marco Brasil|PSD
+2200|Vermelho|PL
+1300|Arilson Chiorato|PT
+4433|Luisa Canziani|UNIÃO
+1199|Tião Medeiros|PP
+1123|Cristina Silvestri|PP
+2322|Evandro Roman|CIDADANIA
+1500|Karime Fayad|MDB
+4500|Tulio Bandeira|PSDB
+2020|Da Costa do Perdeu Piá|PODE
+4477|Flávio Ferrari Faca na Bota|UNIÃO
+3030|Guilherme Kilter|NOVO
+4440|Hermes Frangão Parcianello|UNIÃO
+3003|Indiara Barbosa|NOVO
+1144|Naiany Hruschka|PP
+2202|Ricardo Arruda|PL
+1111|Toninho Wandscheer|PP
+1213|Bianca Soares|PDT
+1007|Boca Aberta|REPUBLICANOS
+2233|Carlise Kwiatkowski|PL
+1051|Gisele Camargo|REPUBLICANOS
+1234|Laís Leão|PDT
+5555|Marcelo Rangel|PSD
+1133|Thiago Kodama|PP
+2225|Ademar Dorfschmidt|PL
+4011|Dr Haroldo|PSB
+5569|Elcio Jaime|PSD
+1533|Fubá|MDB
+1311|Gilvan Federal|PT
+3009|Henrique Mecabô|NOVO
+5500|Leandre|PSD
+4050|Mario Certo|PSB
+2026|Rodrigo Estacho|PODE
+1324|Carol Silva|PT
+1101|Dani Ziober|PP
+1415|Delegado Eduardo Kruger|MISSÃO
+2211|Delegado Francischini|PL
+1122|Dilceu Sperafico|PP
+1299|Dr. Julio|PDT
+1506|Eduardo Bantle|MDB
+4411|Elis Saldivar|UNIÃO
+1225|Jesus Brasil|PDT
+4088|Lambe-lambe|PSB
+7755|Leticia Fernandes|SOLIDARIEDADE
+1077|Marcio Pacheco|REPUBLICANOS
+2226|Miriam Ferreira|PL
+5520|Paranhos|PSD
+4488|Santin Roveda|UNIÃO
+1210|Sérgio Gallina|PDT
+2559|Alfredo Kaefer|PRD
+4000|Camilla Gonda|PSB
+3022|Capitão Marques|NOVO
+1517|Carol Chab|MDB
+1226|Cintia Siqueira|PDT
+5550|Cloara Pinheiro|PSD
+3051|Dra Drielli|NOVO
+3060|Dr Magno|NOVO
+2294|Dulci Carmo|PL
+1321|Eduardo Guadagnin|PT
+1121|Emanuel Cavalar|PP
+5563|Heraldo Trento|PSD
+7710|Ledi Almeida|SOLIDARIEDADE
+2002|Marco Antonio Travessolo|PODE
+1266|Neia Pavanni|PDT
+2217|Olimpio|PL
+1414|Pedro Deyrot|MISSÃO
+1000|Pedro Lupion|REPUBLICANOS
+1315|Professora Michele|PT
+4044|Rejane Soldani|PSB
+2022|Renan Ceschin|PODE
+1151|Ricardo Barros|PP
+1522|Ricardo Maia|MDB
+2055|Sandra Tarabayne|PODE
+1190|Soldado Gerson|PP
+2210|Stephanes|PL
+2223|Subtenente Dioney|PL
+6500|Toninho da Instalbombas|PCdoB
+1322|Ualid Rabah|PT
+1530|Wilson Soler|MDB
+1526|Airton José|MDB
+5005|Alana Landal|PSOL
+1011|Alexandre Leprevost|REPUBLICANOS
+2208|Andrea Dias|PL
+5077|Aroldo Santos|PSOL
+1208|Bernadete Brandão|PDT
+5501|Beto Preto|PSD
+2251|Cantora Juliana Valiati|PL
+3002|Cássia D Amore|NOVO
+2060|Coronel Minikélo|PODE
+2242|Débora Carvalho|PL
+4578|Dra Andréia Grutdner|PSDB
+1177|Dra. Cris Veloso|PP
+1251|Dr. Leandro Water|PDT
+1400|Gabriel Bertolucci|MISSÃO
+3043|Guilherme Livoti|NOVO
+3050|Homero Marchese|NOVO
+1599|João da 5 Irmãos|MDB
+1066|Jorge Derblí|REPUBLICANOS
+1103|Julieta Reis|PP
+2262|Junior Santos Rosa|PL
+5544|Lucas Barone|PSD
+1201|Mãe Gi|PDT
+2012|Marcia Santos|PODE
+1255|Marcio Rosa|PDT
+1406|Mari Guedes Pcd|MISSÃO
+2216|Marta Padovani|PL
+1010|Meri Martins|REPUBLICANOS
+1540|Mirador|MDB
+3033|Neto Santos da Multiloja|NOVO
+7707|Professora Angela Garcia|SOLIDARIEDADE
+4043|Professora Marli Gonçalves|PSB
+1515|Professor Euler|MDB
+5044|Prof. João Henrique|PSOL
+1290|Rene Peninha|PDT
+1445|Ricardo Cascavel Mais Segura|MISSÃO
+4300|Rosane Ferreira|PV
+5505|Sergio Fialho|PSD
+5521|Walter Volpato|PSD
+1312|Welter|PT
+1233|Zezinho Fisioterapeuta|PDT
+1026|Acsa Bonjardim|REPUBLICANOS
+3074|Adilson Seidi|NOVO
+1219|Alba Soares|PDT
+2027|Ana Pavelski|PODE
+1207|Ari Nomax|PDT
+5055|Braga|PSOL
+5590|Cabo Lins|PSD
+1365|Célio Rodrigues e Coletivo|PT
+4555|Chico Brasileiro|PSDB
+1055|Chimentão|REPUBLICANOS
+1231|Cristina Balestra|PDT
+5533|Darlan Scalco|PSD
+1520|Dra Patricia|MDB
+3535|Dra. Rose de Paula|O DEMOCRATA
+4099|Dr. Francismar|PSB
+1442|Dr. Guilherme Machado|MISSÃO
+3011|Dr Taffarel Defensor Animais|NOVO
+1516|Edson Scabora|MDB
+3010|Eduardo Gazzi|NOVO
+1220|Fábio Gaspar da Saúde|PDT
+1274|Fagundes|PDT
+3007|Faynara Barbosa|NOVO
+4045|Fernandão|PSB
+1422|Fernando Garbatchevski|MISSÃO
+1004|General Hermeson|REPUBLICANOS
+1080|Gustavo Torres|REPUBLICANOS
+1099|Janaina Bombeira|REPUBLICANOS
+1221|Jeane|PDT
+4554|Juliana Barros|PSDB
+3070|Laryssa Silva|NOVO
+3041|Letícia Fanini|NOVO
+5580|Luizão Goulart|PSD
+3593|Miguel Bombeiro|O DEMOCRATA
+1023|Newton Bonin|REPUBLICANOS
+3090|Nilson Oliveira|NOVO
+3026|Paulo Espíndola Caminhoneiro|NOVO
+3012|Pedro Radade|NOVO
+1230|Professora Ana Lúcia|PDT
+1303|Professora Terezinha|PT
+2219|Rafael Dantas|PL
+2300|Renata Bueno|CIDADANIA
+2267|Ricardo Pinaffi|PL
+3044|Robison Pedrosso|NOVO
+1511|Rogerio Carboni|MDB
+3023|Sara Lima|NOVO
+2090|Saymon Veiga|PODE
+5567|Serginho do Posto|PSD
+2299|Shanisys|PL
+4012|Solitário|PSB
+2212|Toninho da Farmácia|PL
+1545|Vereador Ademilson|MDB
+1525|Vilson Falcão|MDB
+3055|William Barros|NOVO
+5508|Adão Pereira Federal|PSD
+`;
+
+const D_ESTADUAL = `
+22789|Giselli Bianchini|PL
+11357|Sancho|PP
+22022|Delegado Jacovós|PL
+13800|Lenir de Assis|PT
+30077|Ariane Assis|NOVO
+20222|Do Carmo|PODE
+13013|Prof. Lemos|PT
+22777|Delegada Tathiana Guzella|PL
+30789|Marinho Guimaraes|NOVO
+22111|Flávia Francischini|PL
+70222|Professor Pablo Jamilk|AVANTE
+22500|Jessicão|PL
+55128|Luis Corti|PSD
+55900|Soldado Adriano José|PSD
+13500|Dr. Antenor|PT
+22007|João Bettega|PL
+30000|Luiz Fernando Guerra|NOVO
+22888|Matheus Vermelho|PL
+14441|Beatriz Oliveira|MISSÃO
+55588|Luzia Prado|PSD
+12322|Ana Moro|PDT
+22222|Gilberto Ribeiro|PL
+20234|Isaura Paludo|PODE
+22123|Jairo Tamura|PL
+10123|Alexandre Amaro|REPUBLICANOS
+10789|Jasson Goulart|REPUBLICANOS
+55123|Marcio Nunes|PSD
+30022|Bruno Secco|NOVO
+44800|Cleverson Sibulski|UNIÃO
+30630|Matheus Simões|NOVO
+13050|Thays Bieberbach|PT
+30777|André Santos|NOVO
+12108|Goura|PDT
+55456|Marcelo Roque|PSD
+50500|Professora Angela|PSOL
+55789|Traiano|PSD
+22345|Zado|PL
+13132|Andreia de Lima|PT
+13222|Angelo Vanhoni|PT
+30300|Fabio Oliveira|NOVO
+22422|Fran Boni|PL
+15123|Gerson Colodel|MDB
+50321|Jean Henrique|PSOL
+22045|Luiz Mestiço|PL
+55775|Pastora Gloria Archanjo|PSD
+22922|Paulo Melo|PL
+13133|Valentina|PT
+13413|Yasmin Hachem|PT
+15555|Dani Pato|MDB
+22000|Denian Couto|PL
+22224|Dra Carla Rosane|PL
+55001|Flavio Mantovani|PSD
+13130|Giorgia Prates|PT
+30345|Lucas Canassa|NOVO
+22122|Paulo Gomes da Tv|PL
+12333|Rozenilda Buchhorn|PDT
+55777|Thiago Buhrer|PSD
+30234|Amália Tortato|NOVO
+55000|Batatinha|PSD
+15500|Beto Lunitti|MDB
+13213|Beto Vizzotto|PT
+55055|Cobra Reporter|PSD
+30123|Deivid Wisley|NOVO
+55888|Hussein Bakri|PSD
+15055|Josiel Lima|MDB
+11511|Maria Victoria|PP
+13123|Miss Preta|PT
+11333|Paulo Mac Donald|PP
+13100|Prof. Nelsi Welter|PT
+11000|Valdecir Alcantara Rodrigues|PP
+55125|Adão Litro|PSD
+11111|Alisson Anthony Wandscheer|PP
+15190|Anibelli Neto|MDB
+13000|Bia Alcantara|PT
+16123|Bia Brehm|PSTU
+30118|Celma Gomes Assis|NOVO
+15800|Eloir Almeida|MDB
+30333|Flávio Zanrosso|NOVO
+15678|Irineu Wessler|MDB
+30100|João Portugal|NOVO
+20000|Lu Bonatto|PODE
+22148|Mapê|PL
+55800|Marli Paulino|PSD
+13333|Paula Vicente|PT
+13567|Pedro Ivo|PT
+18222|Perdigão|REDE
+15026|Professor Neves|MDB
+44180|Prof. Raquel Barros|UNIÃO
+55555|Secretária Márcia|PSD
+12121|Thadeu Requião|PDT
+18123|Toninho da Cic|REDE
+44777|Adoaldo Sá|UNIÃO
+12012|Alexandre Guimarães|PDT
+20111|Allax Siqueira|PODE
+14777|Bruno Vieira|MISSÃO
+10456|Cantora Mara Lima|REPUBLICANOS
+13190|Daiane Morais|PT
+13012|Doutora Marilene|PT
+70103|Dra. Caroline Dias|AVANTE
+22357|Dr. Cesar Mello|PL
+12135|Dr. Fabricio Kleinibing|PDT
+55120|Evandro Araujo|PSD
+30007|Fabrizio Meller|NOVO
+55022|Gugu Bueno|PSD
+13321|Guilherme Mazer|PT
+20020|Herivelto Oliveira|PODE
+22444|Itamar Paim|PL
+13116|Ivan Kainggang|PT
+22025|Jane Marree|PL
+70070|Joel Cordeiro|AVANTE
+80000|Juliane Mendes|UP
+15600|Leonardo Pacheco|MDB
+65000|Magáli Zambão|PCdoB
+30222|Professora Aline|NOVO
+22001|Ricardo Zampieri|PL
+55111|Roberto Justus|PSD
+55678|Romanelli|PSD
+22100|Sergio Frederico|PL
+20022|Sgt Carlos Souza|PODE
+15000|Tercilio Turini|MDB
+13023|Teresa Mendes|PT
+65123|Thiago Bagatim|PCdoB
+20300|Adalmo Chimarreando|PODE
+30020|Adriana Senter|NOVO
+45700|Adriano Amaral Viana|PSDB
+70192|Afonso Lima|AVANTE
+18888|Agnaldo Baraldi|REDE
+13033|Anderson Prego da Silva|PT
+44444|Andressa Bianchessi|UNIÃO
+10777|Aninha Santos Lima|REPUBLICANOS
+30303|Aryon|NOVO
+22555|Bacil|PL
+55600|Bazana|PSD
+30191|Cabo Luz do Acampamento|NOVO
+44123|Delegado Amir Salmen|UNIÃO
+44222|Deoclecio Duarte|UNIÃO
+22622|Dirlete Pinheiro|PL
+11211|Dr Braulio|PP
+15005|Dr Kosmos|MDB
+50123|Eloy Nhandewa|PSOL
+22700|Fão do Bolsonaro|PL
+13200|Fernando Sangue Laranja|PT
+43777|Geraldo Stocco|PV
+14000|Gustavo Camillo|MISSÃO
+13233|Inácio Werle|PT
+43333|Ivony Costa|PV
+12240|João Mendonça|PDT
+15777|Juliane Vieira|MDB
+13003|Ju Mildemberg|PT
+10010|Juninho|REPUBLICANOS
+15100|Junior Weiller|MDB
+23456|Lurdinha do Povo|CIDADANIA
+11100|Mabel Canto|PP
+45000|Marcelinho da Saúde|PSDB
+13813|Marcelly Leder|PT
+10852|Marcos da Vidofer|REPUBLICANOS
+12088|Marcos Ribas|PDT
+14444|Mari Mazzon|MISSÃO
+13113|Matteus Henrique|PT
+15111|Miltinho|MDB
+55455|Moacyr Fadel|PSD
+20007|Ogier Buchi|PODE
+12100|Paola Reis|PDT
+12020|Pati Salvação|PDT
+18881|Poeta Angela|REDE
+12777|Professora Sandra Miranda|PDT
+15234|Professora Sandra Soethe|MDB
+30700|Renato Tocumantel da Farmácia|NOVO
+12412|Rodolfo Fiorucci|PDT
+22002|Rosângela Rosa|PL
+70022|Samuka|AVANTE
+10150|Suelen da Feira|REPUBLICANOS
+22322|Talita Feitosa|PL
+13331|Tassia Castelli|PT
+44500|Toninho da Farmácia|UNIÃO
+13022|Valter do Pt|PT
+13131|Vanda de Assis|PT
+18777|Vieira da Educação|REDE
+45800|Adelino Ribeiro|PSDB
+20023|Adriana Carvalho|PODE
+45789|Adry Ribeiro Ong Eva|PSDB
+14039|Alessandra Lima|MISSÃO
+70000|Alex Canziani|AVANTE
+15222|Aline Trindade|MDB
+70007|Amanda da Jesus House|AVANTE
+44111|Ana Kerber|UNIÃO
+50055|Ana Maria de Carvalho|PSOL
+15153|Ana Paula Vilar|MDB
+10444|Anderson Cardoso|REPUBLICANOS
+11555|Andréa Zancko|PP
+22233|André Trindade|PL
+45044|Ari Valdir|PSDB
+20026|Artidor Soares|PODE
+30010|Aurélio Savi|NOVO
+45100|Beto da Rolemax|PSDB
+55810|Bihl Zanetti|PSD
+22090|Cabo Cassol|PL
+15038|Cabo Cesar Augusto|MDB
+20220|Cantor Kalebe|PODE
+20345|Capitão Bart|PODE
+`;
+
+// Ordem de votação igual à da urna real:
+// Dep. Federal → Dep. Estadual → Senador (1ª vaga) → Senador (2ª vaga) → Governador → Presidente
+const CARGOS = [
+  { chave:"dep_federal",  label:"DEPUTADO FEDERAL",       digitos:4, candidatos:dados(D_FEDERAL) },
+  { chave:"dep_estadual", label:"DEPUTADO ESTADUAL",      digitos:5, candidatos:dados(D_ESTADUAL) },
+  { chave:"senador1",     label:"SENADOR — PR (1ª VAGA)", digitos:3, candidatos:dados(D_SENADOR) },
+  { chave:"senador2",     label:"SENADOR — PR (2ª VAGA)", digitos:3, candidatos:dados(D_SENADOR) },
+  { chave:"governador",   label:"GOVERNADOR — PR",        digitos:2, candidatos:dados(D_GOVERNADOR) },
+  { chave:"presidente",   label:"PRESIDENTE",             digitos:2, candidatos:dados(D_PRESIDENTE) }
+];
+
+let cargoAtual = 0;
+let numeroDigitado = "";
+let votos = [];
+let votoSenador1Numero = null;
+
+const cargoLabel = document.getElementById('cargoLabel');
+const numeroDisplay = document.getElementById('numeroDisplay');
+const candidatoInfo = document.getElementById('candidatoInfo');
+const msgSistema = document.getElementById('msgSistema');
+const telaFinal = document.getElementById('telaFinal');
+const resumoLista = document.getElementById('resumoLista');
+
+function cargoDef(){ return CARGOS[Math.min(cargoAtual, CARGOS.length-1)]; }
+function maxDigitos(){ return cargoDef().digitos; }
+
+function render(){
+  const def = cargoDef();
+  cargoLabel.textContent = def.label;
+  const slots = [];
+  for(let i=0;i<maxDigitos();i++){
+    slots.push(numeroDigitado[i] !== undefined ? numeroDigitado[i] : "—");
+  }
+  numeroDisplay.textContent = slots.join(" ");
+
+  if(numeroDigitado.length === 0){
+    candidatoInfo.innerHTML = "Digite o número do candidato e aperte CONFIRMA.";
+    msgSistema.textContent = "";
+    return;
+  }
+  if(numeroDigitado.length === maxDigitos()){
+    const cand = def.candidatos[numeroDigitado];
+    if(cand){
+      candidatoInfo.innerHTML = `<div class="candidato-nome">${cand.nome}</div><div class="candidato-partido">${cand.partido}</div>`;
+      msgSistema.textContent = "CONFIRMA para registrar · CORRIGE para apagar";
+    } else {
+      candidatoInfo.innerHTML = `<div class="msg-erro">NÚMERO INVÁLIDO<br>NENHUM CANDIDATO ENCONTRADO</div>`;
+      msgSistema.textContent = "Aperte CORRIGE para tentar novamente.";
+    }
+  } else {
+    candidatoInfo.innerHTML = "";
+    msgSistema.textContent = "";
+  }
+}
+
+function votacaoEncerrada(){ return cargoAtual >= CARGOS.length; }
+
+// ---- Sons (gerados no próprio aparelho, aproximando os da urna real) ----
+let audioCtx = null;
+function ctxAudio(){
+  try{
+    if(!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if(audioCtx.state === 'suspended') audioCtx.resume();
+  }catch(e){ audioCtx = null; }
+  return audioCtx;
+}
+// Cada nota: [frequência Hz, atraso s, duração s]
+function tocarNotas(notas, vol){
+  const c = ctxAudio(); if(!c) return;
+  const base = c.currentTime + 0.01;
+  notas.forEach(([freq, atraso, dur])=>{
+    const t = base + atraso;
+    const o = c.createOscillator(), g = c.createGain(), f = c.createBiquadFilter();
+    o.type = 'square';
+    o.frequency.value = freq;
+    f.type = 'lowpass'; f.frequency.value = 3800;   // tira o "chiado" da onda quadrada
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(vol, t + 0.005);
+    g.gain.setValueAtTime(vol, t + Math.max(0.01, dur - 0.012));
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(f); f.connect(g); g.connect(c.destination);
+    o.start(t); o.stop(t + dur + 0.02);
+  });
+}
+// Como na urna real, os números digitados NÃO fazem som (para não revelar o voto).
+const somTecla = () => {};
+// Voto intermediário confirmado: um bip curto.
+const somConfirma = () => tocarNotas([[1050, 0, 0.13]], 0.13);
+// "FIM": sequência rápida de bipes ("pi-li-li-li-li…") terminando num bipe longo ("…m").
+const somFim = () => tocarNotas([
+  [1180, 0.00, 0.055], [1180, 0.09, 0.055], [1180, 0.18, 0.055],
+  [1180, 0.27, 0.055], [1180, 0.36, 0.055], [1180, 0.45, 0.055],
+  [1180, 0.56, 1.00]
+], 0.15);
+function somImpressora(ms){
+  const c = ctxAudio(); if(!c) return;
+  const fim = performance.now() + ms;
+  (function tique(){
+    if(performance.now() >= fim) return;
+    const t = c.currentTime, len = 0.035;
+    const buf = c.createBuffer(1, Math.floor(c.sampleRate * len), c.sampleRate);
+    const d = buf.getChannelData(0);
+    for(let i=0;i<d.length;i++) d[i] = (Math.random()*2-1) * (1 - i/d.length);
+    const s = c.createBufferSource(), f = c.createBiquadFilter(), g = c.createGain();
+    f.type = 'bandpass'; f.frequency.value = 2600; f.Q.value = 0.8;
+    g.gain.value = 0.22;
+    s.buffer = buf; s.connect(f); f.connect(g); g.connect(c.destination);
+    s.start(t);
+    setTimeout(tique, 55);
+  })();
+}
+
+function digitar(n){
+  if(votacaoEncerrada()) return;
+  if(numeroDigitado.length >= maxDigitos()) return;
+  somTecla();
+  numeroDigitado += String(n);
+  render();
+}
+
+function corrige(){
+  if(votacaoEncerrada()) return;
+  somTecla();
+  numeroDigitado = "";
+  render();
+}
+
+function votarBranco(){
+  if(votacaoEncerrada()) return;
+  votos.push({cargo: cargoDef().label, nome: "VOTO EM BRANCO", partido: null});
+  avancarCargo();
+}
+
+function confirma(){
+  if(votacaoEncerrada()) return;
+  const def = cargoDef();
+  if(numeroDigitado.length !== maxDigitos()) return;
+  const cand = def.candidatos[numeroDigitado];
+  if(!cand) return;
+  if(def.chave === "senador2" && numeroDigitado === votoSenador1Numero){
+    candidatoInfo.innerHTML = `<div class="msg-erro">VOTO JÁ REGISTRADO<br>PARA A 1ª VAGA</div>`;
+    msgSistema.textContent = "Escolha outro candidato para a 2ª vaga.";
+    return;
+  }
+  if(def.chave === "senador1") votoSenador1Numero = numeroDigitado;
+  votos.push({cargo: def.label, nome: cand.nome, partido: cand.partido, numero: numeroDigitado});
+  avancarCargo();
+}
+
+function avancarCargo(){
+  numeroDigitado = "";
+  cargoAtual++;
+  if(votacaoEncerrada()){
+    finalizar();
+  } else {
+    somConfirma();
+    render();
+  }
+}
+
+function finalizar(){
+  cargoLabel.textContent = "FIM";
+  numeroDisplay.textContent = "";
+  candidatoInfo.innerHTML = "<div class='candidato-nome'>VOTAÇÃO ENCERRADA</div>";
+  msgSistema.textContent = "Obrigado por votar!";
+
+  telaFinal.style.display = "block";
+  const boletimEl = document.getElementById('boletim');
+  boletimEl.classList.remove('saiu');
+  resumoLista.innerHTML = votos.map(v => `
+    <div class="resumo-item">
+      <span class="rotulo">${v.cargo}</span>
+      <span class="valor">${v.nome}${v.partido ? " ("+v.partido+")" : ""}</span>
+    </div>
+  `).join("");
+  document.getElementById('colinhaLista').innerHTML = votos.map((v,i) => `
+    <div class="colinha-item cor-${i % 6}">
+      <span class="colinha-numero">${v.numero ? v.numero : "✕"}</span>
+      <span class="colinha-textos">
+        <span class="colinha-cargo">${v.cargo}</span><br>
+        <span class="colinha-nome">${v.numero ? v.nome : "VOTO EM BRANCO"}</span>
+      </span>
+    </div>
+  `).join("");
+  document.getElementById('dataHoraBoletim').textContent = new Date().toLocaleString('pt-BR');
+
+  somFim();
+
+  // Depois do "pililili…m" do FIM, o comprovante sai como de uma impressora térmica
+  clearTimeout(timerImpressora);
+  timerImpressora = setTimeout(()=>{
+    somImpressora(3200);
+    boletimEl.classList.add('saiu');
+    telaFinal.scrollIntoView({behavior:'smooth', block:'start'});
+  }, 2000);
+}
+let timerImpressora = null;
+
+function textoBoletim(){
+  const linhas = votos.map(v => `${v.cargo}: ${v.nome}${v.partido ? " ("+v.partido+")" : ""}`);
+  const colinha = votos.map(v => `${v.cargo}: ${v.numero ? v.numero : "BRANCO"}`);
+  return "🗳️ MINHA COLINHA PARA VOTAR (na ordem da urna)\n"
+    + colinha.join("\n")
+    + "\n\n✂ - - - - - - - - - - - -\n*** COMPROVANTE DE SIMULAÇÃO — SEM VALOR ELEITORAL ***\n"
+    + linhas.join("\n")
+    + "\n\nSimulação não oficial, não vinculada ao TSE. Treine antes de votar!";
+}
+
+function reiniciar(){
+  clearTimeout(timerImpressora);
+  window.scrollTo({top:0});
+  cargoAtual = 0;
+  numeroDigitado = "";
+  votos = [];
+  votoSenador1Numero = null;
+  document.getElementById('boletim').classList.remove('saiu');
+  telaFinal.style.display = "none";
+  render();
+}
+
+document.querySelectorAll('.tecla[data-num]').forEach(btn=>{
+  btn.addEventListener('click', ()=> digitar(btn.dataset.num));
+});
+document.getElementById('btnCorrige').addEventListener('click', corrige);
+document.getElementById('btnConfirma').addEventListener('click', confirma);
+document.getElementById('btnBranco').addEventListener('click', votarBranco);
+document.getElementById('btnReiniciar').addEventListener('click', reiniciar);
+
+// Aviso minimizável no canto
+const avisoChip = document.getElementById('avisoChip');
+const avisoPainel = document.getElementById('avisoPainel');
+avisoChip.addEventListener('click', ()=>{
+  const aberto = avisoPainel.classList.toggle('aberto');
+  avisoChip.setAttribute('aria-expanded', aberto);
+  avisoChip.textContent = aberto ? "✕ fechar aviso" : "⚠ SIMULAÇÃO · toque p/ ver aviso";
+});
+
+document.getElementById('btnImprimir').addEventListener('click', ()=>{
+  window.print();
+});
+
+document.getElementById('btnCompartilhar').addEventListener('click', ()=>{
+  // Abre direto no WhatsApp (app no celular, WhatsApp Web no computador) com o texto pronto.
+  window.open("https://wa.me/?text=" + encodeURIComponent(textoBoletim()), '_blank');
+});
+
+// ---- Teclado físico do computador ----
+document.addEventListener('keydown', (e)=>{
+  if(votacaoEncerrada()) return;
+  if(e.key >= '0' && e.key <= '9'){
+    e.preventDefault();
+    digitar(e.key);
+  } else if(e.key === 'Enter'){
+    e.preventDefault();
+    confirma();
+  } else if(e.key === 'Backspace' || e.key === 'Delete'){
+    e.preventDefault();
+    corrige();
+  } else if(e.key === ' ' || e.code === 'Space'){
+    e.preventDefault();
+    votarBranco();
+  }
+});
+
+render();
+</script>
+</body>
+</html>
