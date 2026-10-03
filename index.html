@@ -244,6 +244,7 @@
   }
   .resumo-item span.rotulo{color:#666;font-weight:bold;white-space:nowrap;}
   .resumo-item span.valor{text-align:right;}
+  .dica-print{margin-top:10px;font-size:13px;color:#0a4d2e;text-align:center;line-height:1.4;}
   .btn-reiniciar{
     margin-top:18px;
     width:100%;
@@ -529,6 +530,8 @@
     <button class="btn-acao-final imprimir" id="btnImprimir" type="button">🖨️ Imprimir comprovante</button>
     <button class="btn-acao-final compartilhar" id="btnCompartilhar" type="button">💬 Compartilhar no WhatsApp</button>
   </div>
+
+  <div class="dica-print">📸 Dica: você também pode tirar um <b>print da tela</b> da sua colinha e enviar a imagem nos grupos.</div>
 
   <button class="btn-reiniciar" id="btnReiniciar" type="button">Fazer nova simulação</button>
   <div class="disclaimer-final">
@@ -1813,6 +1816,7 @@ function finalizar(){
 }
 let timerImpressora = null;
 
+const LINK_SIMULADOR = "https://hodhreego.github.io/urna-eletronica-pr/";
 function textoBoletim(){
   const linhas = votos.map(v => `${v.cargo}: ${v.nome}${v.partido ? " ("+v.partido+")" : ""}`);
   const colinha = votos.map(v => `${v.cargo}: ${v.numero ? v.numero : "BRANCO"}`);
@@ -1820,7 +1824,8 @@ function textoBoletim(){
     + colinha.join("\n")
     + "\n\n✂ - - - - - - - - - - - -\n*** COMPROVANTE DE SIMULAÇÃO — SEM VALOR ELEITORAL ***\n"
     + linhas.join("\n")
-    + "\n\nSimulação não oficial, não vinculada ao TSE. Treine antes de votar!";
+    + "\n\nSimulação não oficial, sem valor eleitoral. Treine antes de votar!"
+    + "\n\n" + LINK_SIMULADOR;
 }
 
 function reiniciar(){
